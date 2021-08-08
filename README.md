@@ -16,7 +16,7 @@ Welcome! Here is my Julia code to simulate 2D convection in a Cartesian box. The
 convect-jl
     docs/
     src/
-        convect_lineat.jl
+        convect_linear.jl
         critical_ra.jl
         routines.jl
     LICENSE.md
