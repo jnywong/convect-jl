@@ -1,1 +1,59 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # convect-jl
+
+![](docs/figures/linear.png)
+
+Welcome! Here is my Julia code to simulate 2D convection in a Cartesian box. Theory and methods used can be found in [Introduction to Modeling Convection in Planets and Stars: Magnetic Field, Density Stratification, Rotation](https://press.princeton.edu/books/hardcover/9780691141725/introduction-to-modeling-convection-in-planets-and-stars). 
+
+## Getting Started
+
+### Pre-requisites
+- [Julia](https://julialang.org/) (version 1.6)
+
+## Package structure
+```
+convect-jl
+    docs/
+    src/
+        convect_lineat.jl
+        critical_ra.jl
+        routines.jl
+    LICENSE.md
+    README.md
+```
+
+## Examples
+
+### Linear convection
+
+1. Open `src/convect_linear.jl`
+
+2. Specify input parameters
+   
+```
+# Inputs
+nz = 101 # no. of vertical gridpoints
+nn = 3 # no. of Fourier modes (excluding 0)
+a = sqrt(2) # L/D aspect ratio
+Ra = 1500 # Rayleigh number
+Pr = 0.3 # Prandtl number
+nt = 10^5 # no. of timesteps
+nout = 500 # output every nout timesteps
+```
+3. Run script from terminal using `julia <working directory>/convect-jl/src/convect_linear.jl` (or from julia REPL using `include(<working directory>/convect-jl/src/convect_linear.jl)`
+
+4. Admire the output:
+
+![](docs/figures/linear.png)
+
+## Authors
+
+* [**Jenny Wong**](https://jnywong.netlify.app/) - *Institut des Sciences de la Terre*
+  
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+
+:tada:
