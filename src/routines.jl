@@ -65,8 +65,15 @@ module routines
         return tem_out
     end
 
+    function first_deriv(k,n,dz,tem,omg,dtemdz2,domgdz2)
+        # First z derivatives in tem and omg
+        dtemdz1[k,n] = (tem[k+1,n,2] - tem[k-1,n,2])/(2*dz) # (2.15)
+        domgdz1[k,n] = (omg[k+1,n,2] - omg[k-1,n,2])/(2*dz) # (2.15)
+        return dtemdz1, domgdz1
+    end
+
     function second_deriv(k,n,dz,tem,omg,dtemdz2,domgdz2)
-        # Second derivatives in tem and omg
+        # Second z derivatives in tem and omg
         dtemdz2[k,n] = (tem[k+1,n,2] - 2*tem[k,n,2] + tem[k-1,n,2])/dz^2 # (2.16)
         domgdz2[k,n] = (omg[k+1,n,2] - 2*omg[k,n,2] + omg[k-1,n,2])/dz^2 # (2.16)
         return dtemdz2, domgdz2
@@ -105,7 +112,7 @@ module routines
         return dtemdt, domgdt, tem, omg, psi
     end
 
-    function sol(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt)
+    function linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt)
         m = 0
         time = 0
         while m<=nt
@@ -155,8 +162,7 @@ module routines
         return sina
     end    
 
-    function ict(a,x,nn,nx,nz,coeffs,outfun)
-        cosa = cosines(a,x,nn,nx)
+    function ict(nn,nx,nz,cosa,coeffs,outfun)
         for i = 1:1:nx
             for k = 1:1:nz
                 for n=1:1:nn
@@ -167,8 +173,7 @@ module routines
         return outfun
     end
 
-    function ist(a,x,nn,nx,nz,coeffs,outfun)
-        sina = sines(a,x,nn,nx)
+    function ist(nn,nx,nz,sina,coeffs,outfun)
         for i = 1:1:nx
             for k = 1:1:nz
                 for n=1:1:nn

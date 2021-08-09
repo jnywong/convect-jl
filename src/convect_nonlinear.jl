@@ -28,7 +28,7 @@ for n=1:1:nn
 end
 
 # Time integration
-tem, omg, psi = routines.linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt)
+tem, omg, psi = routines.sol(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt)
 
 # horizontal domain
 x, dx = routines.xdomain(a,nz)
@@ -36,10 +36,8 @@ x, dx = routines.xdomain(a,nz)
 # Spectral to spatial transforms in x-direction
 tem_full, omg_full, psi_full = routines.preallocate_spat(nz,nx)
 tem_full = routines.ref_tem(nx,nz,z,tem_full) # reference temperature
-cosa = cosines(a,x,nn,nx) # compute and store cosines
-sina = sines(a,x,nn,nx) # compute and store sines
-tem_full = routines.ict(nn,nx,nz,cosa,tem,tem_full) # inverse cosine transform
-psi_full = routines.ist(nn,nx,nz,sina,psi,psi_full) # inverse sine transform
+tem_full = routines.ict(a,x,nn,nx,nz,tem,tem_full) # inverse cosine transform
+psi_full = routines.ist(a,x,nn,nx,nz,psi,psi_full) # inverse sine transform
 
 # Plot
 temLim = maximum(abs.(tem_full))
