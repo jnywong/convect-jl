@@ -1,6 +1,7 @@
 module routines
     using Printf
     using LinearAlgebra
+    using Distributions
     export all
     
     function poisson(b,nz,dz,n,a)
@@ -8,7 +9,7 @@ module routines
         du = fill(-1/dz^2, nz-1) # upper diagonal
         dl = fill(-1/dz^2, nz-1) # lower diagonal
         for k=2:1:nz-1
-            d[k] = (n*pi/a)^2 + 2/dz^2
+            d[k] = ((n-1)*pi/a)^2 + 2/dz^2
         end
         # Boundary conditions
         d[1] = 1 # (2.22a)
@@ -26,7 +27,7 @@ module routines
         nx = Int(ceil(a*nz)) # no. of horizontal gridpoints
         dx = a/(nx-1)
         x = LinRange(0.0,a,nx)
-        return x, dx
+        return x, dx, nx
     end
 
     function zdomain(nz)
@@ -43,19 +44,27 @@ module routines
     end
 
     function preallocate_spec(nz, nn)
-        psi = zeros(nz,nn,2)
-        tem = zeros(nz,nn,2)
-        omg = zeros(nz,nn,2)
-        dtemdz2 = zeros(nz,nn)
-        domgdz2 = zeros(nz,nn)
-        dtemdt = zeros(nz,nn,2)
-        domgdt = zeros(nz,nn,2)
-        return psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt
+        # Includes zeroth mode
+        psi = zeros(nz,nn+1,2)
+        tem = zeros(nz,nn+1,2)
+        omg = zeros(nz,nn+1,2)
+        return psi, tem, omg 
     end
 
-    function initial_tem(z)
-        y = sin.(pi*z) # satisfies (3.6) T(0)=T(1) at time t=0
-        return y
+    function initial_linear_tem(nz,nn,z,tem)
+        tem[:,1,2] = fill(1,nz) - z # zeroth mode
+        for n=2:1:nn+1
+            tem[:,n,2] = sin.(pi*z) # satisfies (3.6) T(0)=T(1) at time t=0
+        end
+        return tem
+    end
+
+    function initial_nonlinear_tem(nz,nn,z,tem,fac=1e-3)
+        tem[:,1,2] = fill(1,nz) - z # zeroth mode
+        for n=2:1:nn+1
+            tem[:,n,2] = fac*rand(Uniform(-1, 1))*sin.(pi*z) # satisfies (3.6) T(0)=T(1) at time t=0
+        end
+        return tem
     end
 
     function ref_tem(nx,nz,z,tem_out)
@@ -65,41 +74,38 @@ module routines
         return tem_out
     end
 
-    function first_deriv(k,n,dz,tem,omg,dtemdz2,domgdz2)
-        # First z derivatives in tem and omg
-        dtemdz1[k,n] = (tem[k+1,n,2] - tem[k-1,n,2])/(2*dz) # (2.15)
-        domgdz1[k,n] = (omg[k+1,n,2] - omg[k-1,n,2])/(2*dz) # (2.15)
-        return dtemdz1, domgdz1
+    function first_deriv(k,n,dz,y,dydz)
+        # First derivative w.r.t z
+        dydz[k,n] = (y[k+1,n,2] - y[k-1,n,2])/(2*dz) # (2.15)
+        return dydz
     end
 
-    function second_deriv(k,n,dz,tem,omg,dtemdz2,domgdz2)
-        # Second z derivatives in tem and omg
-        dtemdz2[k,n] = (tem[k+1,n,2] - 2*tem[k,n,2] + tem[k-1,n,2])/dz^2 # (2.16)
-        domgdz2[k,n] = (omg[k+1,n,2] - 2*omg[k,n,2] + omg[k-1,n,2])/dz^2 # (2.16)
-        return dtemdz2, domgdz2
+    function second_deriv(k,n,dz,y,dydz2)
+        # Second derivative w.r.t z
+        dydz2[k,n] = (y[k+1,n,2] - 2*y[k,n,2] + y[k-1,n,2])/dz^2 # (2.16)
+        return dydz2
     end
 
     function tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
         # Update time deriv dtemdt
-        dtemdt[k,n,2] = (n*pi/a)*psi[k,n,2] + (dtemdz2[k,n]-(n*pi/a)^2*tem[k,n,2]) # (3.3)
+        dtemdt[k,n,2] = ((n-1)*pi/a)*psi[k,n,2] + (dtemdz2[k,n]-((n-1)*pi/a)^2*tem[k,n,2]) # (3.3)
         return dtemdt
     end
 
     function omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
         # Update time deriv domgt
-        domgdt[k,n,2] = Ra*Pr*(n*pi/a)*tem[k,n,2] + Pr*(domgdz2[k,n] - (n*pi/a)^2*omg[k,n,2]) # (3.4)
+        domgdt[k,n,2] = Ra*Pr*((n-1)*pi/a)*tem[k,n,2] + Pr*(domgdz2[k,n] - ((n-1)*pi/a)^2*omg[k,n,2]) # (3.4)
         return domgdt 
     end
 
-    function adamsbashforth(tem, omg, dt, dtemdt, domgdt)
-        tem[:,:,2] = tem[:,:,1] + 0.5*dt*(3*dtemdt[:,:,2]-dtemdt[:,:,1]) # (2.18)
-        omg[:,:,2] = omg[:,:,1] + 0.5*dt*(3*domgdt[:,:,2]-domgdt[:,:,1]) # (2.18)
-        return tem, omg
+    function adamsbashforth(n, y, dydt, dt)
+        y[:,n,2] = y[:,n,1] + 0.5*dt*(3*dydt[:,n,2]-dydt[:,n,1]) # (2.18)
+        return y
     end
 
     function diagnostics(m,nz,nout,time,tem,omg,psi)
-        if mod(m,nout)==0
-            @printf("time: %.2f    tem: %.5e    omg: %.5e    psi: %.5e \n ", time, log(abs(tem[round.(Int,nz/3),1,2]))-log(abs(tem[round.(Int,nz/3),1,1])),log(abs(omg[round.(Int,nz/3),1,2]))-log(abs(omg[round.(Int,nz/3),1,1])),log(abs(psi[round.(Int,nz/3),1,2]))-log(abs(psi[round.(Int,nz/3),1,1])))
+        if mod(m,nout)==0 # track n=1 mode over time at z = nz/3
+            @printf("time: %.2f    tem: %.5e    omg: %.5e    psi: %.5e \n ", time, log(abs(tem[round.(Int,nz/3),2,2]))-log(abs(tem[round.(Int,nz/3),2,1])),log(abs(omg[round.(Int,nz/3),2,2]))-log(abs(omg[round.(Int,nz/3),2,1])),log(abs(psi[round.(Int,nz/3),2,2]))-log(abs(psi[round.(Int,nz/3),2,1])))
         end
     end
 
@@ -112,23 +118,32 @@ module routines
         return dtemdt, domgdt, tem, omg, psi
     end
 
-    function linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt)
+    function linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg)
         m = 0
         time = 0
+        dtemdz2 = zeros(nz,nn+1)
+        domgdz2 = zeros(nz,nn+1)
+        dtemdt = zeros(size(tem))
+        domgdt = zeros(size(omg))
         while m<=nt
             for k=2:1:nz-1
-                for n=1:1:nn
-                    dtemdz2, domgdz2 = second_deriv(k ,n, dz, tem, omg, dtemdz2, domgdz2)
+                for n=2:1:nn+1
+                    dtemdz2 = second_deriv(k ,n, dz, tem, dtemdz2)
+                    domgdz2 = second_deriv(k ,n, dz, omg, domgdz2)
                     dtemdt = tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
                     domgdt = omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
                 end
             end
 
+            # display(dtemdt[:,:,2])
             # Update tem and omg using Adams Bashforth time integration
-            tem, omg = adamsbashforth(tem, omg, dt, dtemdt, domgdt)
+            for n=2:1:nn+1
+                tem = adamsbashforth(n, tem, dtemdt, dt)
+                omg = adamsbashforth(n, omg, domgdt, dt)
+            end
 
             # Update psi using poisson solver
-            for n=1:1:nn
+            for n=2:1:nn+1
                 psi[:,n,2] = poisson(omg[:,n,2],nz,dz,n,a) # (3.5)
             end
 
@@ -146,27 +161,33 @@ module routines
 
     function cosines(a, x, nn, nx)
         # Compute cosines and sines 
-        cosa = zeros(nn,nx)
-        for n=1:1:nn
-            cosa[n,:] = cos.(n*pi*x/a)
+        cosa = zeros(nn+1,nx)
+        for n=1:1:nn+1
+            cosa[n,:] = cos.((n-1)*pi*x/a)
         end
         return cosa
     end
 
     function sines(a, x, nn, nx)
         # Compute cosines and sines 
-        sina = zeros(nn,nx)
-        for n=1:1:nn
-            sina[n,:] = sin.(n*pi*x/a)
+        sina = zeros(nn+1,nx)
+        for n=1:1:nn+1
+            sina[n,:] = sin.((n-1)*pi*x/a)
         end
         return sina
     end    
 
-    function ict(nn,nx,nz,cosa,coeffs,outfun)
+    function ict(nn,nx,nz,cosa,coeffs,outfun,zeroth=1)
         for i = 1:1:nx
             for k = 1:1:nz
-                for n=1:1:nn
-                    outfun[k,i] += coeffs[k,n,2]*cosa[n,i]
+                if zeroth==1 # include zeroth mode
+                    for n=1:1:nn+1
+                        outfun[k,i] += coeffs[k,n,2]*cosa[n,i]
+                    end
+                elseif zeroth==0 # exclude zeroth mode
+                    for n=2:1:nn+1
+                        outfun[k,i] += coeffs[k,n,2]*cosa[n,i]
+                    end
                 end
             end
         end
@@ -176,7 +197,7 @@ module routines
     function ist(nn,nx,nz,sina,coeffs,outfun)
         for i = 1:1:nx
             for k = 1:1:nz
-                for n=1:1:nn
+                for n=1:1:nn+1
                     outfun[k,i] += coeffs[k,n,2]*sina[n,i]
                 end
             end

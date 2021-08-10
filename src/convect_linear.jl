@@ -6,12 +6,13 @@ using LaTeXStrings
 
 # Inputs
 nz = 101 # no. of vertical gridpoints
-nn = 3 # no. of Fourier modes (excluding 0)
+nn = 1 # no. of Fourier modes (excluding zeroth mode)
 a = sqrt(2) # L/D aspect ratio
-Ra = 1500 # Rayleigh number
+Ra = 660 # Rayleigh number
 Pr = 0.3 # Prandtl number
-nt = 10^5 # no. of timesteps
-nout = 500 # output every nout timesteps
+nt = 1e5 # no. of timesteps
+nout =  500 # output every nout timesteps
+zeroth = 1 # include zeroth order temperature in plot?
 
 # Vertical domain
 z, dz = routines.zdomain(nz)
@@ -19,33 +20,37 @@ z, dz = routines.zdomain(nz)
 # Timestep size
 dt = 0.9*dz^2/4 # (2.19)
 
-# Pre-allocation
-psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt = routines.preallocate_spec(nz,nn)
+# Pre-allocate arrays for spectral coefficients
+psi, tem, omg = routines.preallocate_spec(nz,nn)
 
 # Initial conditions
-for n=1:1:nn
-    tem[:,n,2] = routines.initial_tem(z)
-end
+tem = routines.initial_linear_tem(nz,nn,z,tem)
 
 # Time integration
-tem, omg, psi = routines.linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt)
+tem, omg, psi = routines.linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg)
 
 # horizontal domain
-x, dx = routines.xdomain(a,nz)
+x, dx, nx = routines.xdomain(a,nz)
 
 # Spectral to spatial transforms in x-direction
 tem_full, omg_full, psi_full = routines.preallocate_spat(nz,nx)
-tem_full = routines.ref_tem(nx,nz,z,tem_full) # reference temperature
-cosa = cosines(a,x,nn,nx) # compute and store cosines
-sina = sines(a,x,nn,nx) # compute and store sines
-tem_full = routines.ict(nn,nx,nz,cosa,tem,tem_full) # inverse cosine transform
+cosa = routines.cosines(a,x,nn,nx) # compute and store cosines
+sina = routines.sines(a,x,nn,nx) # compute and store sines
+tem_full = routines.ict(nn,nx,nz,cosa,tem,tem_full,zeroth) # inverse cosine transform
 psi_full = routines.ist(nn,nx,nz,sina,psi,psi_full) # inverse sine transform
 
 # Plot
-temLim = maximum(abs.(tem_full))
 psiLim = maximum(abs.(psi_full))
-p1 = heatmap(x, z, tem_full, c=:balance, levels = 100) #, clim=(-temLim,temLim))
-contour!(x, z, psi_full, c=:grays,levels=20,lw=2,colorbar=true) #, clim=(-psiLim,psiLim))
+temLim = maximum(abs.(tem_full))
+if max(1,temLim)==1
+    cbar_range=(0,1)
+else
+    cbar_range=(-temLim, temLim)
+end
+psi_scale = psi_full/psiLim*cbar_range[2] # scale so that psi is within cbar range for plot
+
+p1 = heatmap(x, z, tem_full, c=:balance, levels = 100, clim=cbar_range, colorbar=true)
+contour!(x, z, psi_scale, c=:grays,levels=20,lw=2,colorbar = true)
 xlabel!(L"x")
 ylabel!(L"z")
 a_title = round(a,digits=2)

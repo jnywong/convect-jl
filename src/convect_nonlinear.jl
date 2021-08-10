@@ -6,12 +6,12 @@ using LaTeXStrings
 
 # Inputs
 nz = 101 # no. of vertical gridpoints
-nn = 3 # no. of Fourier modes (excluding 0)
+nn = 1 # no. of Fourier modes (excluding zeroth mode)
 a = sqrt(2) # L/D aspect ratio
-Ra = 1500 # Rayleigh number
+Ra = 660 # Rayleigh number
 Pr = 0.3 # Prandtl number
-nt = 10^5 # no. of timesteps
-nout = 500 # output every nout timesteps
+nt = 1 # no. of timesteps
+nout = 1# 500 # output every nout timesteps
 
 # Vertical domain
 z, dz = routines.zdomain(nz)
@@ -23,12 +23,10 @@ dt = 0.9*dz^2/4 # (2.19)
 psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt = routines.preallocate_spec(nz,nn)
 
 # Initial conditions
-for n=1:1:nn
-    tem[:,n,2] = routines.initial_tem(z)
-end
+tem = routines.initial_nonlinear_tem(nz,nn,z,tem)
 
 # Time integration
-tem, omg, psi = routines.sol(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt)
+tem, omg, psi = routines.linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, dtemdz2, domgdz2, dtemdt, domgdt)
 
 # horizontal domain
 x, dx = routines.xdomain(a,nz)
