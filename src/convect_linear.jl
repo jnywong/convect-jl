@@ -6,12 +6,12 @@ using LaTeXStrings
 
 # Inputs
 nz = 101 # no. of vertical gridpoints
-nn = 1 # no. of Fourier modes (excluding zeroth mode)
-a = sqrt(2) # L/D aspect ratio
-Ra = 660 # Rayleigh number
-Pr = 0.3 # Prandtl number
-nt = 1e5 # no. of timesteps
-nout =  500 # output every nout timesteps
+nn = 3 # no. of Fourier modes (excluding zeroth mode)
+a = 3 # L/D aspect ratio
+Ra = 10e5 # Rayleigh number
+Pr = 0.5 # Prandtl number
+nt = 5000 # no. of timesteps
+nout =  1 # output every nout timesteps
 zeroth = 1 # include zeroth order temperature in plot?
 
 # Vertical domain

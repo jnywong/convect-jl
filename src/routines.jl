@@ -159,6 +159,86 @@ module routines
         return tem, omg, psi
     end
 
+    function nonlinear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg)
+        m = 0
+        time = 0
+        dtemdz1 = zeros(nz,nn+1)
+        domgdz1 = zeros(nz,nn+1) 
+        dpsidz1 = zeros(nz,nn+1)                
+        dtemdz2 = zeros(nz,nn+1)
+        domgdz2 = zeros(nz,nn+1)
+        dtemdt = zeros(size(tem))
+        domgdt = zeros(size(omg))
+        while m<=nt
+            for k=2:1:nz-1
+                # Linear terms
+                for n=2:1:nn+1
+                    dtemdz1 = first_deriv(k ,n, dz, tem, dtemdz1)
+                    domgdz1 = first_deriv(k ,n, dz, omg, domgdz1)
+                    dpsidz1 = first_deriv(k ,n, dz, psi, dpsidz1)
+                    dtemdz2 = second_deriv(k ,n, dz, tem, dtemdz2)
+                    domgdz2 = second_deriv(k ,n, dz, omg, domgdz2)
+                    dtemdt = tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
+                    domgdt = omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
+                end
+                # Nonlinear terms
+                for n1=2:1:nn+1
+                    # Zeroth mode
+                    dtemdt[k,1,2] += -pi/(2*a)*(n1-1)*(dpsidz1[k,n1]*tem[k,n1,2]+psi[k,n1,2]*dtemdz1[k,n1])
+                end
+                for n=2:1:nn+1
+                    # n'= 0 mode
+                    dtemdt[k,n,2] += -(n-1)*pi/a*psi[k,n,2]*dtemdz1[k,1]
+                    # n'> 0
+                    for n1=2:1:nn+1
+                        n2 = zeros(Int8,3)
+                        tem_term = zeros(Float64,3)
+                        omg_term = zeros(Float64,3)
+                        n2[1] = (n-1)-(n1-1)
+                        n2[2] = (n-1)+(n1-1)
+                        n2[3] = (n1-1)-(n-1)
+                        for i=1:1:length(n2)
+                            # Check if 2<=n<=nn+1, no contribution if not
+                            if i==1 && n2[i]>=2 && n2[i]<=nn+1
+                                tem_term[i] = -(n1-1)*dpsidz1[k,n2[i]]*tem[k,n1,2]+n2[i]*psi[k,n2[i],2]*dtemdz1[k,n1]
+                                omg_term[i] = -(n1-1)*dpsidz1[k,n2[i]]*omg[k,n1,2]+n2[i]*psi[k,n2[i],2]*domgdz1[k,n1]
+                            elseif i==2 && n2[i]>=2 && n2[i]<=nn+1
+                                tem_term[i] = (n1-1)*dpsidz1[k,n2[i]]*tem[k,n1,2]+n2[i]*psi[k,n2[i],2]*dtemdz1[k,n1]
+                                omg_term[i] = -(n1-1)*dpsidz1[k,n2[i]]*omg[k,n1,2]-n2[i]*psi[k,n2[i],2]*domgdz1[k,n1]
+                            elseif i==3 && n2[i]>=2 && n2[i]<=nn+1
+                                tem_term[i] = (n1-1)*dpsidz1[k,n2[i]]*tem[k,n1,2]+n2[i]*psi[k,n2[i],2]*dtemdz1[k,n1]
+                                omg_term[i] = (n1-1)*dpsidz1[k,n2[i]]*omg[k,n1,2]-n2[i]*psi[k,n2[i],2]*domgdz1[k,n1]
+                            end
+                        end
+                        dtemdt[k,n,2] += -pi/(2*a)*(sum(tem_term))
+                    end
+                end
+            end
+
+            # display(dtemdt[:,:,2])
+            # Update tem and omg using Adams Bashforth time integration
+            for n=2:1:nn+1
+                tem = adamsbashforth(n, tem, dtemdt, dt)
+                omg = adamsbashforth(n, omg, domgdt, dt)
+            end
+
+            # Update psi using poisson solver
+            for n=2:1:nn+1
+                psi[:,n,2] = poisson(omg[:,n,2],nz,dz,n,a) # (3.5)
+            end
+
+            # Diagnostics
+            diagnostics(m, nz, nout, time, tem, omg, psi)
+
+            # Prepare values for next timestep
+            dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
+
+            m+=1
+            time += dt
+        end
+        return tem, omg, psi
+    end
+
     function cosines(a, x, nn, nx)
         # Compute cosines and sines 
         cosa = zeros(nn+1,nx)
