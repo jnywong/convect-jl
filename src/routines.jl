@@ -2,6 +2,8 @@ module routines
     using Printf
     using LinearAlgebra
     using Distributions
+    include("data_utils.jl")
+    using .data_utils
     export all
     
     function poisson(b,nz,dz,n,a)
@@ -104,9 +106,8 @@ module routines
     end
 
     function diagnostics(m,nz,nout,time,tem,omg,psi)
-        if mod(m,nout)==0 # track n=1 mode over time at z = nz/3
-            @printf("time: %.2f    tem: %.5e    omg: %.5e    psi: %.5e \n ", time, log(abs(tem[round.(Int,nz/3),2,2]))-log(abs(tem[round.(Int,nz/3),2,1])),log(abs(omg[round.(Int,nz/3),2,2]))-log(abs(omg[round.(Int,nz/3),2,1])),log(abs(psi[round.(Int,nz/3),2,2]))-log(abs(psi[round.(Int,nz/3),2,1])))
-        end
+        # track n=1 mode over time at z = nz/3
+        @printf("time: %.2f    tem: %.5e    omg: %.5e    psi: %.5e \n ", time, log(abs(tem[round.(Int,nz/3),2,2]))-log(abs(tem[round.(Int,nz/3),2,1])),log(abs(omg[round.(Int,nz/3),2,2]))-log(abs(omg[round.(Int,nz/3),2,1])),log(abs(psi[round.(Int,nz/3),2,2]))-log(abs(psi[round.(Int,nz/3),2,1])))
     end
 
     function prepare(dtemdt, domgdt, tem, omg, psi)
@@ -159,17 +160,27 @@ module routines
         return tem, omg, psi
     end
 
-    function nonlinear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg)
+    function nonlinear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, initOn, saveDir)
+        if initOn==1
+            rm(saveDir,recursive=true)
+            data_utils.save_inputs(saveDir,nz,nn,a,Ra,Pr,dt,nt,nout)
+            ndata = 0
+            time = 0
+            dtemdt = zeros(size(tem))
+            domgdt = zeros(size(omg))
+            tem = routines.initial_nonlinear_tem(nz,nn,z,tem)
+        elseif initOn==0
+            nz,nn,a,Ra,Pr,dt,nt,nout = data_utils.load_inputs(saveDir)
+            time, ndata = data_utils.load_outputs(saveDir)
+            dtemdt, domgdt, tem, omg, psi = data_utils.load_data(saveDir,ndata-1)
+        end
         m = 0
-        time = 0
         dtemdz1 = zeros(nz,nn+1)
         domgdz1 = zeros(nz,nn+1) 
-        dpsidz1 = zeros(nz,nn+1)                
+        dpsidz1 = zeros(nz,nn+1)
         dtemdz2 = zeros(nz,nn+1)
         domgdz2 = zeros(nz,nn+1)
-        dtemdt = zeros(size(tem))
-        domgdt = zeros(size(omg))
-        while m<=nt
+        while m<nt
             for k=2:1:nz-1
                 # Linear terms
                 for n=2:1:nn+1
@@ -214,28 +225,30 @@ module routines
                     end
                 end
             end
-
             # display(dtemdt[:,:,2])
             # Update tem and omg using Adams Bashforth time integration
             for n=2:1:nn+1
                 tem = adamsbashforth(n, tem, dtemdt, dt)
                 omg = adamsbashforth(n, omg, domgdt, dt)
             end
-
             # Update psi using poisson solver
             for n=2:1:nn+1
                 psi[:,n,2] = poisson(omg[:,n,2],nz,dz,n,a) # (3.5)
             end
-
-            # Diagnostics
-            diagnostics(m, nz, nout, time, tem, omg, psi)
-
-            # Prepare values for next timestep
-            dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
-
+            # Save and print diagnostics
+            if mod(m,nout)==0 
+                diagnostics(m, nz, nout, time, tem, omg, psi)
+                # Prepare values for next timestep
+                dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
+                data_utils.save_data(saveDir,ndata,dtemdt, domgdt, tem, omg, psi)
+                ndata+=1
+            else
+                dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
+            end
             m+=1
             time += dt
         end
+        data_utils.save_outputs(saveDir, time, ndata)
         return tem, omg, psi
     end
 
