@@ -15,6 +15,7 @@ module data_utils
         fid["dt"] = dt
         fid["nt"] = nt
         fid["nout"] = nout
+        close(fid)
     end
 
     function save_data(saveDir, ndata, dtemdt, domgdt, tem, omg, psi)
@@ -26,6 +27,7 @@ module data_utils
         fid["psi"] = psi
         fid["omg"] = omg
         fid["tem"] = tem
+        close(fid)
     end
 
     function save_outputs(saveDir,time,ndata)
@@ -34,6 +36,7 @@ module data_utils
         fid = HDF5.h5open(saveName,"w")
         fid["time"] = time
         fid["ndata"] = ndata
+        close(fid)
     end
 
     function load_inputs(saveDir)

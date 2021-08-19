@@ -63,9 +63,10 @@ module routines
 
     function initial_nonlinear_tem(nz,nn,z,tem,fac=1e-3)
         tem[:,1,2] = fill(1,nz) - z # zeroth mode
-        for n=2:1:nn+1
-            tem[:,n,2] = fac*rand(Uniform(-1, 1))*sin.(pi*z) # satisfies (3.6) T(0)=T(1) at time t=0
-        end
+        tem[:,2,2] = 0.01*sin.(pi*z) # §4.4.2 A nonlinear benchmark
+        # for n=2:1:nn+1
+        #     tem[:,n,2] = fac*rand(Uniform(-1, 1))*sin.(pi*z) # satisfies (3.6) T(0)=T(1) at time t=0
+        # end
         return tem
     end
 
@@ -88,17 +89,29 @@ module routines
         return dydz2
     end
 
-    function tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
+    function lin_tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
         # Update time deriv dtemdt
         dtemdt[k,n,2] = ((n-1)*pi/a)*psi[k,n,2] + (dtemdz2[k,n]-((n-1)*pi/a)^2*tem[k,n,2]) # (3.3)
         return dtemdt
     end
 
-    function omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
+    function lin_omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
         # Update time deriv domgt
         domgdt[k,n,2] = Ra*Pr*((n-1)*pi/a)*tem[k,n,2] + Pr*(domgdz2[k,n] - ((n-1)*pi/a)^2*omg[k,n,2]) # (3.4)
         return domgdt 
     end
+
+    function nonlin_tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
+        # Update time deriv dtemdt
+        dtemdt[k,n,2] = (dtemdz2[k,n]-((n-1)*pi/a)^2*tem[k,n,2]) # (3.3) with first term on RHS removed
+        return dtemdt
+    end
+
+    function nonlin_omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
+        # Update time deriv domgt
+        domgdt[k,n,2] = Ra*Pr*((n-1)*pi/a)*tem[k,n,2] + Pr*(domgdz2[k,n] - ((n-1)*pi/a)^2*omg[k,n,2]) # same as (3.4)
+        return domgdt 
+    end    
 
     function adamsbashforth(n, y, dydt, dt)
         y[:,n,2] = y[:,n,1] + 0.5*dt*(3*dydt[:,n,2]-dydt[:,n,1]) # (2.18)
@@ -116,6 +129,8 @@ module routines
         tem[:,:,1] = tem[:,:,2]
         omg[:,:,1] = omg[:,:,2]
         psi[:,:,1] = psi[:,:,2]
+        dtemdt[:,:,2] .=0
+        domgdt[:,:,2] .=0
         return dtemdt, domgdt, tem, omg, psi
     end
 
@@ -131,8 +146,8 @@ module routines
                 for n=2:1:nn+1
                     dtemdz2 = second_deriv(k ,n, dz, tem, dtemdz2)
                     domgdz2 = second_deriv(k ,n, dz, omg, domgdz2)
-                    dtemdt = tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
-                    domgdt = omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
+                    dtemdt = lin_tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
+                    domgdt = lin_omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
                 end
             end
 
@@ -162,7 +177,8 @@ module routines
 
     function nonlinear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, initOn, saveDir)
         if initOn==1
-            rm(saveDir,recursive=true)
+            rm(saveDir,recursive=true, force=true)
+            mkdir(saveDir)
             data_utils.save_inputs(saveDir,nz,nn,a,Ra,Pr,dt,nt,nout)
             ndata = 0
             time = 0
@@ -183,15 +199,18 @@ module routines
         while m<nt
             for k=2:1:nz-1
                 # Linear terms
-                for n=2:1:nn+1
+                for n=1:1:nn+1
                     dtemdz1 = first_deriv(k ,n, dz, tem, dtemdz1)
                     domgdz1 = first_deriv(k ,n, dz, omg, domgdz1)
                     dpsidz1 = first_deriv(k ,n, dz, psi, dpsidz1)
                     dtemdz2 = second_deriv(k ,n, dz, tem, dtemdz2)
                     domgdz2 = second_deriv(k ,n, dz, omg, domgdz2)
-                    dtemdt = tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
-                    domgdt = omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
+                    dtemdt = nonlin_tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
+                    domgdt = nonlin_omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
                 end
+                # if k==33
+                #     display(dtemdt[33,:,:])
+                # end
                 # Nonlinear terms
                 for n1=2:1:nn+1
                     # Zeroth mode
@@ -222,10 +241,11 @@ module routines
                             end
                         end
                         dtemdt[k,n,2] += -pi/(2*a)*(sum(tem_term))
+                        domgdt[k,n,2] += -pi/(2*a)*(sum(omg_term))
                     end
                 end
             end
-            # display(dtemdt[:,:,2])
+            
             # Update tem and omg using Adams Bashforth time integration
             for n=2:1:nn+1
                 tem = adamsbashforth(n, tem, dtemdt, dt)
@@ -247,9 +267,9 @@ module routines
             end
             m+=1
             time += dt
+            data_utils.save_outputs(saveDir, time, ndata)
         end
-        data_utils.save_outputs(saveDir, time, ndata)
-        return tem, omg, psi
+        return dtemdt, domgdt, tem, omg, psi
     end
 
     function cosines(a, x, nn, nx)
