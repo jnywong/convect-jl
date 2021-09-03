@@ -4,7 +4,7 @@ module data_utils
     export all
 
     function save_inputs(saveDir,nz,nn,a,Ra,Pr,dt,nt,nout)
-        isdir(saveDir) || mkdir(saveDir)
+        isdir(saveDir) || mkpath(saveDir)
         saveName=string(saveDir,"/inputs.h5")
         fid = HDF5.h5open(saveName,"w")
         fid["nz"] = nz
@@ -19,7 +19,7 @@ module data_utils
     end
 
     function save_data(saveDir, ndata, dtemdt, domgdt, tem, omg, psi)
-        isdir(saveDir) || mkdir(saveDir)
+        isdir(saveDir) || mkpath(saveDir)
         saveName=string(saveDir,"/data_",lpad(ndata,4,"0"),".h5")
         fid = HDF5.h5open(saveName,"w")
         fid["dtemdt"] = dtemdt
@@ -31,7 +31,7 @@ module data_utils
     end
 
     function save_outputs(saveDir,time,ndata)
-        isdir(saveDir) || mkdir(saveDir)
+        isdir(saveDir) || mkpath(saveDir)
         saveName=string(saveDir,"/outputs.h5")
         fid = HDF5.h5open(saveName,"w")
         fid["time"] = time
@@ -50,6 +50,7 @@ module data_utils
         dt = HDF5.read(fid["dt"])
         nt = HDF5.read(fid["nt"])
         nout = HDF5.read(fid["nout"])
+        close(fid)
         return nz,nn,a,Ra,Pr,dt,nt,nout
     end
 
@@ -61,6 +62,7 @@ module data_utils
         psi = HDF5.read(fid["psi"])
         omg = HDF5.read(fid["omg"])
         tem = HDF5.read(fid["tem"])
+        close(fid)
         return dtemdt, domgdt, tem, omg, psi
     end
 
@@ -69,6 +71,7 @@ module data_utils
         fid = HDF5.h5open(saveName,"r")
         time = HDF5.read(fid["time"])
         ndata = HDF5.read(fid["ndata"])
+        close(fid)
         return time, ndata
     end
 

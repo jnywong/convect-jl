@@ -39,12 +39,15 @@ convect-jl
 ```
 # Inputs
 nz = 101 # no. of vertical gridpoints
-nn = 3 # no. of Fourier modes (excluding 0)
-a = sqrt(2) # L/D aspect ratio
-Ra = 1500 # Rayleigh number
-Pr = 0.3 # Prandtl number
-nt = 10^5 # no. of timesteps
-nout = 500 # output every nout timesteps
+nn = 30 # no. of horizontal Fourier modes (excluding zeroth mode)
+a = 5 # L/D aspect ratio
+Ra = 2700 # Rayleigh number
+Pr = 0.5 # Prandtl number
+nt = 1e5 # no. of timesteps
+nout = 1e3 # output every nout timesteps
+zeroth = 0 # include zeroth order temperature in plot?
+initOn = 1
+saveDir = "/Users/wongj/Documents/convect-out/linear/2021-09-03"
 ```
 3. Run script from terminal using `julia <working directory>/convect-jl/src/convect_linear.jl` (or from julia REPL using `include("<working directory>/convect-jl/src/convect_linear.jl")` )
 

@@ -4,8 +4,6 @@ using BenchmarkTools
 using Plots
 using LaTeXStrings
 
-# NOTE: too much power in each mode compared with nonlinear case 
-
 # Inputs
 nz = 101 # no. of vertical gridpoints
 nn = 30 # no. of horizontal Fourier modes (excluding zeroth mode)
@@ -15,8 +13,8 @@ Pr = 0.5 # Prandtl number
 nt = 1e5 # no. of timesteps
 nout = 1e3 # output every nout timesteps
 zeroth = 0 # include zeroth order temperature in plot?
-initOn = 1
-saveDir = "/Users/wongj/Documents/convect-out/linear/2021-09-02"
+initOn = 1 # initialise from scratch?
+saveDir = "/Users/wongj/Documents/convect-out/linear/2021-09-03"
 
 # Vertical domain
 z, dz = routines.zdomain(nz)

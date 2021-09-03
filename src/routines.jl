@@ -140,15 +140,24 @@ module routines
 
     function linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, initOn, saveDir)
         if initOn==1
-            rm(saveDir, recursive = true, force = true)
+            rm(saveDir,recursive=true, force=true)
             mkpath(saveDir)
+            data_utils.save_inputs(saveDir,nz,nn,a,Ra,Pr,dt,nt,nout)
+            ndata = 0
+            time = 0
+            dtemdt = zeros(size(tem))
+            domgdt = zeros(size(omg))
+            tem = routines.initial_linear_tem(nz,nn,z,tem)
+        elseif initOn==0
+            nz,nn,a,Ra,Pr,dt,nt,nout = data_utils.load_inputs(saveDir)
+            time, ndata = data_utils.load_outputs(saveDir)
+            dtemdt, domgdt, tem, omg, psi = data_utils.load_data(saveDir,ndata-1)
         end
         m = 0
         time = 0
         dtemdz2 = zeros(nz,nn+1)
         domgdz2 = zeros(nz,nn+1)
-        dtemdt = zeros(size(tem))
-        domgdt = zeros(size(omg))
+
         while m<=nt
             for k=2:1:nz-1
                 for n=2:1:nn+1
@@ -174,19 +183,23 @@ module routines
             # Diagnostics
             if mod(m,nout)==0
                 diagnostics(m, nz, nout, time, tem, omg, psi)
+                data_utils.save_data(saveDir,ndata,dtemdt, domgdt, tem, omg, psi)
+                ndata+=1
+                # Prepare values for next timestep
+                dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
                 # open(string(saveDir,"/k_33_dtemdt.csv"),"a+") do f
                 # @printf(f,"%16.8f\n",dtemdt[33,2,2])
                 # end
                 # open(string(saveDir,"/k_33_tem.csv"),"a+") do f
                 # @printf(f,"%16.8f\n",tem[33,2,2])
-                # end                
+                # end
+            else
+                # Prepare values for next timestep
+                dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
             end
-
-            # Prepare values for next timestep
-            dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
-
             m+=1
             time += dt
+            data_utils.save_outputs(saveDir, time, ndata)
         end
         return dtemdt, domgdt, tem, omg, psi
     end
@@ -284,18 +297,18 @@ module routines
                 diagnostics(m, nz, nout, time, tem, omg, psi)
                 data_utils.save_data(saveDir,ndata,dtemdt, domgdt, tem, omg, psi)
                 ndata+=1
-                open(string(saveDir,"/k_33_n_1_dtemdt.csv"),"a+") do f
-                @printf(f,"%16.8f\n",dtemdt[33,2,2])
-                end
-                open(string(saveDir,"/k_33_n_1_tem.csv"),"a+") do f
-                @printf(f,"%16.8f\n",tem[33,2,2])
-                end        
-                open(string(saveDir,"/k_33_n_2_dtemdt.csv"),"a+") do f
-                @printf(f,"%16.8f\n",dtemdt[33,3,2])
-                end
-                open(string(saveDir,"/k_33_n_2_tem.csv"),"a+") do f
-                @printf(f,"%16.8f\n",tem[33,3,2])
-                end        
+                # open(string(saveDir,"/k_33_n_1_dtemdt.csv"),"a+") do f
+                # @printf(f,"%16.8f\n",dtemdt[33,2,2])
+                # end
+                # open(string(saveDir,"/k_33_n_1_tem.csv"),"a+") do f
+                # @printf(f,"%16.8f\n",tem[33,2,2])
+                # end        
+                # open(string(saveDir,"/k_33_n_2_dtemdt.csv"),"a+") do f
+                # @printf(f,"%16.8f\n",dtemdt[33,3,2])
+                # end
+                # open(string(saveDir,"/k_33_n_2_tem.csv"),"a+") do f
+                # @printf(f,"%16.8f\n",tem[33,3,2])
+                # end        
                 # Prepare values for next timestep
                 dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
             else
