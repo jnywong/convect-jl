@@ -6,8 +6,6 @@ using BenchmarkTools
 using Plots
 using LaTeXStrings
 
-# TODO: odd modes are not updated
-
 # Inputs
 nz = 101 # no. of vertical gridpoints
 nn = 50 # no. of Fourier modes (excluding zeroth mode)
@@ -17,7 +15,7 @@ Pr = 0.5 # Prandtl number
 dt = 3e-6 # timestep size
 nt = 1e4 # no. of timesteps
 nout = 1e2 # save output every nout timesteps
-initOn = 0 # initialise run, otherwise load existing data
+initOn = 1 # initialise run, otherwise load existing data
 saveDir = string("/Users/wongj/Documents/convect-out/","2021-09-03") # save directory
 
 # Vertical domain

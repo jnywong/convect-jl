@@ -8,7 +8,7 @@ using LaTeXStrings
 
 # Inputs
 nz = 101 # no. of vertical gridpoints
-nn = 30 # no. of Fourier modes (excluding zeroth mode)
+nn = 30 # no. of horizontal Fourier modes (excluding zeroth mode)
 a = 5 # L/D aspect ratio
 Ra = 2700 # Rayleigh number
 Pr = 0.5 # Prandtl number

@@ -2,7 +2,9 @@
 
 # convect-jl
 
-![](docs/figures/linear.png)
+<p align="center">
+  <img src="docs/figures/video.gif" />
+</p>
 
 Welcome! Here is my Julia code to simulate 2D convection in a Cartesian box. Theory and methods used can be found in [Introduction to Modeling Convection in Planets and Stars: Magnetic Field, Density Stratification, Rotation](https://press.princeton.edu/books/hardcover/9780691141725/introduction-to-modeling-convection-in-planets-and-stars). 
 
@@ -17,7 +19,10 @@ convect-jl
     docs/
     src/
         convect_linear.jl
+        convect_nonlinear.jl
         critical_ra.jl
+        data_utils.jl
+        postprocess.jl
         routines.jl
     LICENSE.md
     README.md
@@ -41,11 +46,46 @@ Pr = 0.3 # Prandtl number
 nt = 10^5 # no. of timesteps
 nout = 500 # output every nout timesteps
 ```
-3. Run script from terminal using `julia <working directory>/convect-jl/src/convect_linear.jl` (or from julia REPL using `include(<working directory>/convect-jl/src/convect_linear.jl)`
+3. Run script from terminal using `julia <working directory>/convect-jl/src/convect_linear.jl` (or from julia REPL using `include("<working directory>/convect-jl/src/convect_linear.jl")` )
 
 4. Admire the output:
 
 ![](docs/figures/linear.png)
+
+### Nonlinear convection
+
+1. Open `src/convect_nonlinear.jl`
+
+2. Specify input parameters
+   
+```
+# Inputs
+nz = 101 # no. of vertical gridpoints
+nn = 50 # no. of Fourier modes (excluding zeroth mode)
+a = 3 # L/D aspect ratio
+Ra = 1e6 # Rayleigh number
+Pr = 0.5 # Prandtl number
+dt = 3e-6 # timestep size
+nt = 1e4 # no. of timesteps
+nout = 1e2 # save output every nout timesteps
+initOn = 1 # initialise run, otherwise load existing data
+saveDir = "/Users/wongj/Documents/convect-out/2021-09-03" # save directory
+```
+3. Run script from terminal using `julia <working directory>/convect-jl/src/convect_nonlinear.jl` (or from julia REPL using `include("<working directory>/convect-jl/src/convect_nonlinear.jl")` )
+
+4. Postprocess and visualise the data using `julia <working directory>/convect-jl/src/postprocess.jl` (or from julia REPL using `include("<working directory>/convect-jl/src/postprocess.jl")` ) with the following input parameters
+
+```
+# Inputs
+saveDir = "/Users/wongj/Documents/convect-out/2021-09-03" # save directory
+nStart = 1
+nEnd = 500
+zeroth= 1 # plot zeroth mode?
+```
+
+5. Admire the output:
+
+![](docs/figures/video.gif)
 
 ## Authors
 
