@@ -4,15 +4,19 @@ using BenchmarkTools
 using Plots
 using LaTeXStrings
 
+# NOTE: too much power in each mode compared with nonlinear case 
+
 # Inputs
 nz = 101 # no. of vertical gridpoints
-nn = 20 # no. of Fourier modes (excluding zeroth mode)
-a = 3 # L/D aspect ratio
-Ra = 1e6 # Rayleigh number
+nn = 30 # no. of Fourier modes (excluding zeroth mode)
+a = 5 # L/D aspect ratio
+Ra = 2700 # Rayleigh number
 Pr = 0.5 # Prandtl number
-nt = 1e6 # no. of timesteps
-nout =  3e5 # output every nout timesteps
-zeroth = 1 # include zeroth order temperature in plot?
+nt = 1e5 # no. of timesteps
+nout = 1e3 # output every nout timesteps
+zeroth = 0 # include zeroth order temperature in plot?
+initOn = 1
+saveDir = "/Users/wongj/Documents/convect-out/linear/2021-09-02"
 
 # Vertical domain
 z, dz = routines.zdomain(nz)
@@ -27,7 +31,7 @@ psi, tem, omg = routines.preallocate_spec(nz,nn)
 tem = routines.initial_linear_tem(nz,nn,z,tem)
 
 # Time integration
-tem, omg, psi = routines.linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg)
+dtemdt, domgdt, tem, omg, psi = routines.linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, initOn, saveDir)
 
 # horizontal domain
 x, dx, nx = routines.xdomain(a,nz)

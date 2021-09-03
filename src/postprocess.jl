@@ -7,9 +7,9 @@ using Plots
 using LaTeXStrings
 
 # Inputs
-saveDir = "/Users/wongj/Documents/convect-out/2021-08-19" # save directory
-ndata = 0
-zeroth=0
+saveDir = "/Users/wongj/Documents/convect-out/2021-09-03" # save directory
+ndata = 500 # file tag
+zeroth= 1 # plot zeroth mode?
 
 # Load
 nz,nn,a,Ra,Pr,dt,nt,nout = data_utils.load_inputs(saveDir)

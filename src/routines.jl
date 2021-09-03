@@ -4,6 +4,7 @@ module routines
     using Distributions
     include("data_utils.jl")
     using .data_utils
+    using CSV
     export all
     
     function poisson(b,nz,dz,n,a)
@@ -55,6 +56,7 @@ module routines
 
     function initial_linear_tem(nz,nn,z,tem)
         tem[:,1,2] = fill(1,nz) - z # zeroth mode
+        # tem[:,2,2] = sin.(pi*z)
         for n=2:1:nn+1
             tem[:,n,2] = sin.(pi*z) # satisfies (3.6) T(0)=T(1) at time t=0
         end
@@ -62,8 +64,10 @@ module routines
     end
 
     function initial_nonlinear_tem(nz,nn,z,tem,fac=1e-3)
-        tem[:,1,2] = fill(1,nz) - z # zeroth mode
-        tem[:,2,2] = 0.01*sin.(pi*z) # §4.4.2 A nonlinear benchmark
+        for i=1:1:2
+            tem[:,1,i] = fill(1,nz) - z # zeroth mode
+            tem[:,2,i] = 0.01*sin.(pi*z) # §4.4.2 A nonlinear benchmark
+        end
         # for n=2:1:nn+1
         #     tem[:,n,2] = fac*rand(Uniform(-1, 1))*sin.(pi*z) # satisfies (3.6) T(0)=T(1) at time t=0
         # end
@@ -85,7 +89,7 @@ module routines
 
     function second_deriv(k,n,dz,y,dydz2)
         # Second derivative w.r.t z
-        dydz2[k,n] = (y[k+1,n,2] - 2*y[k,n,2] + y[k-1,n,2])/dz^2 # (2.16)
+        dydz2[k,n] = (y[k+1,n,2] - 2*y[k,n,2] + y[k-1,n,2])/(dz^2) # (2.16)
         return dydz2
     end
 
@@ -134,7 +138,11 @@ module routines
         return dtemdt, domgdt, tem, omg, psi
     end
 
-    function linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg)
+    function linear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, initOn, saveDir)
+        if initOn==1
+            rm(saveDir, recursive = true, force = true)
+            mkpath(saveDir)
+        end
         m = 0
         time = 0
         dtemdz2 = zeros(nz,nn+1)
@@ -144,14 +152,14 @@ module routines
         while m<=nt
             for k=2:1:nz-1
                 for n=2:1:nn+1
+                    # println("n=",n-1)
                     dtemdz2 = second_deriv(k ,n, dz, tem, dtemdz2)
                     domgdz2 = second_deriv(k ,n, dz, omg, domgdz2)
                     dtemdt = lin_tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
                     domgdt = lin_omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
                 end
             end
-
-            # display(dtemdt[:,:,2])
+            
             # Update tem and omg using Adams Bashforth time integration
             for n=2:1:nn+1
                 tem = adamsbashforth(n, tem, dtemdt, dt)
@@ -164,7 +172,15 @@ module routines
             end
 
             # Diagnostics
-            diagnostics(m, nz, nout, time, tem, omg, psi)
+            if mod(m,nout)==0
+                diagnostics(m, nz, nout, time, tem, omg, psi)
+                # open(string(saveDir,"/k_33_dtemdt.csv"),"a+") do f
+                # @printf(f,"%16.8f\n",dtemdt[33,2,2])
+                # end
+                # open(string(saveDir,"/k_33_tem.csv"),"a+") do f
+                # @printf(f,"%16.8f\n",tem[33,2,2])
+                # end                
+            end
 
             # Prepare values for next timestep
             dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
@@ -172,7 +188,7 @@ module routines
             m+=1
             time += dt
         end
-        return tem, omg, psi
+        return dtemdt, domgdt, tem, omg, psi
     end
 
     function nonlinear_solver(z, dz, nz, nn, nt, nout, dt, a, Ra, Pr, psi, tem, omg, initOn, saveDir)
@@ -198,6 +214,9 @@ module routines
         domgdz2 = zeros(nz,nn+1)
         while m<nt
             for k=2:1:nz-1
+                # if k==33
+                #     println("k:", k)
+                # end
                 # Linear terms
                 for n=1:1:nn+1
                     dtemdz1 = first_deriv(k ,n, dz, tem, dtemdz1)
@@ -205,22 +224,23 @@ module routines
                     dpsidz1 = first_deriv(k ,n, dz, psi, dpsidz1)
                     dtemdz2 = second_deriv(k ,n, dz, tem, dtemdz2)
                     domgdz2 = second_deriv(k ,n, dz, omg, domgdz2)
-                    dtemdt = nonlin_tem_eq(k,n,a,tem,psi,dtemdz2,dtemdt)
-                    domgdt = nonlin_omg_eq(k,n,a,Ra,Pr,tem,omg,domgdz2,domgdt)
+                    dtemdt = nonlin_tem_eq(k, n, a, tem, psi, dtemdz2, dtemdt)
+                    domgdt = nonlin_omg_eq(k, n, a, Ra, Pr, tem, omg, domgdz2, domgdt)
                 end
-                # if k==33
-                #     display(dtemdt[33,:,:])
-                # end
                 # Nonlinear terms
                 for n1=2:1:nn+1
                     # Zeroth mode
                     dtemdt[k,1,2] += -pi/(2*a)*(n1-1)*(dpsidz1[k,n1]*tem[k,n1,2]+psi[k,n1,2]*dtemdz1[k,n1])
                 end
                 for n=2:1:nn+1
+                    # if n==3
+                    #     println("n:", n-1)
+                    # end
                     # n'= 0 mode
                     dtemdt[k,n,2] += -(n-1)*pi/a*psi[k,n,2]*dtemdz1[k,1]
-                    # n'> 0
+                    # 0 < n' < nn
                     for n1=2:1:nn+1
+                        # println("n1:", n1-1)
                         n2 = zeros(Int8,3)
                         tem_term = zeros(Float64,3)
                         omg_term = zeros(Float64,3)
@@ -228,26 +248,30 @@ module routines
                         n2[2] = (n-1)+(n1-1)
                         n2[3] = (n1-1)-(n-1)
                         for i=1:1:length(n2)
-                            # Check if 2<=n<=nn+1, no contribution if not
-                            if i==1 && n2[i]>=2 && n2[i]<=nn+1
-                                tem_term[i] = -(n1-1)*dpsidz1[k,n2[i]]*tem[k,n1,2]+n2[i]*psi[k,n2[i],2]*dtemdz1[k,n1]
-                                omg_term[i] = -(n1-1)*dpsidz1[k,n2[i]]*omg[k,n1,2]+n2[i]*psi[k,n2[i],2]*domgdz1[k,n1]
-                            elseif i==2 && n2[i]>=2 && n2[i]<=nn+1
-                                tem_term[i] = (n1-1)*dpsidz1[k,n2[i]]*tem[k,n1,2]+n2[i]*psi[k,n2[i],2]*dtemdz1[k,n1]
-                                omg_term[i] = -(n1-1)*dpsidz1[k,n2[i]]*omg[k,n1,2]-n2[i]*psi[k,n2[i],2]*domgdz1[k,n1]
-                            elseif i==3 && n2[i]>=2 && n2[i]<=nn+1
-                                tem_term[i] = (n1-1)*dpsidz1[k,n2[i]]*tem[k,n1,2]+n2[i]*psi[k,n2[i],2]*dtemdz1[k,n1]
-                                omg_term[i] = (n1-1)*dpsidz1[k,n2[i]]*omg[k,n1,2]-n2[i]*psi[k,n2[i],2]*domgdz1[k,n1]
+                            # Check if 1<=n<=nn, no contribution if not
+                            if i==1 && n2[i]>=1 && n2[i]<=nn
+                                tem_term[i] = -(n1-1)*dpsidz1[k,n2[i]+1]*tem[k,n1,2]+n2[i]*psi[k,n2[i]+1,2]*dtemdz1[k,n1]
+                                omg_term[i] = -(n1-1)*dpsidz1[k,n2[i]+1]*omg[k,n1,2]+n2[i]*psi[k,n2[i]+1,2]*domgdz1[k,n1]
+                            elseif i==2 && n2[i]>=1 && n2[i]<=nn
+                                tem_term[i] = (n1-1)*dpsidz1[k,n2[i]+1]*tem[k,n1,2]+ n2[i]*psi[k,n2[i]+1,2]*dtemdz1[k,n1]
+                                omg_term[i] = -(n1-1)*dpsidz1[k,n2[i]+1]*omg[k,n1,2]-n2[i]*psi[k,n2[i]+1,2]*domgdz1[k,n1]
+                            elseif i==3 && n2[i]>=1 && n2[i]<=nn
+                                tem_term[i] = (n1-1)*dpsidz1[k,n2[i]+1]*tem[k,n1,2]+n2[i]*psi[k,n2[i]+1,2]*dtemdz1[k,n1]
+                                omg_term[i] = (n1-1)*dpsidz1[k,n2[i]+1]*omg[k,n1,2]+n2[i]*psi[k,n2[i]+1,2]*domgdz1[k,n1]
                             end
                         end
                         dtemdt[k,n,2] += -pi/(2*a)*(sum(tem_term))
                         domgdt[k,n,2] += -pi/(2*a)*(sum(omg_term))
+                        # if sum(tem_term)!=0
+                        #     println(sum(tem_term))
+                        # end
                     end
                 end
             end
-            
+            # display(dtemdt[33,:,:])
+
             # Update tem and omg using Adams Bashforth time integration
-            for n=2:1:nn+1
+            for n=1:1:nn+1
                 tem = adamsbashforth(n, tem, dtemdt, dt)
                 omg = adamsbashforth(n, omg, domgdt, dt)
             end
@@ -258,11 +282,24 @@ module routines
             # Save and print diagnostics
             if mod(m,nout)==0 
                 diagnostics(m, nz, nout, time, tem, omg, psi)
-                # Prepare values for next timestep
-                dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
                 data_utils.save_data(saveDir,ndata,dtemdt, domgdt, tem, omg, psi)
                 ndata+=1
+                open(string(saveDir,"/k_33_n_1_dtemdt.csv"),"a+") do f
+                @printf(f,"%16.8f\n",dtemdt[33,2,2])
+                end
+                open(string(saveDir,"/k_33_n_1_tem.csv"),"a+") do f
+                @printf(f,"%16.8f\n",tem[33,2,2])
+                end        
+                open(string(saveDir,"/k_33_n_2_dtemdt.csv"),"a+") do f
+                @printf(f,"%16.8f\n",dtemdt[33,3,2])
+                end
+                open(string(saveDir,"/k_33_n_2_tem.csv"),"a+") do f
+                @printf(f,"%16.8f\n",tem[33,3,2])
+                end        
+                # Prepare values for next timestep
+                dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
             else
+                # Prepare values for next timestep
                 dtemdt, domgdt, tem, omg, psi = prepare(dtemdt, domgdt, tem, omg, psi)
             end
             m+=1
@@ -319,6 +356,3 @@ module routines
     end
 
 end
-
-
-
