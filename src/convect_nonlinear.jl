@@ -2,6 +2,7 @@ include("routines.jl")
 include("data_utils.jl")
 using .routines
 using .data_utils
+using Dates
 using BenchmarkTools
 using Plots
 using LaTeXStrings
@@ -16,7 +17,7 @@ dt = 3e-6 # timestep size
 nt = 1e4 # no. of timesteps
 nout = 1e2 # save output every nout timesteps
 initOn = 1 # initialise run, otherwise load existing data
-saveDir = string("/Users/wongj/Documents/convect-out/","2021-09-03") # save directory
+saveDir = string("/Users/jnywong/Documents/convect-out/",today(),"test") # save directory
 
 # Vertical domain
 z, dz = routines.zdomain(nz)
