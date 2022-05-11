@@ -7,12 +7,13 @@ using Plots
 using LaTeXStrings
 
 # Inputs
-saveDir = "/Users/wongj/Documents/convect-out/2021-09-03" # save directory
-nStart = 1 
-nEnd = 500
+saveDir = "/Users/wongj/Documents/work/convect-out/2022-05-10/test" # save directory
+subDir = "png" # sub-directory to save images
+nStart = 1
+nEnd = 99
 zeroth= 1 # plot zeroth mode?
 
-isdir(string(saveDir,"/png")) || mkpath(string(saveDir, "/png"))
+isdir(string(saveDir,"/", subDir)) || mkpath(string(saveDir, "/", subDir))
 
 # Load
 nz,nn,a,Ra,Pr,dt,nt,nout = data_utils.load_inputs(saveDir)
@@ -21,7 +22,8 @@ z, dz = routines.zdomain(nz)
 x, dx, nx = routines.xdomain(a,nz)
 
 # Loop
-for k = nStart:1:nEnd
+# anim = @animate for k = nStart:1:nEnd
+for k = nStart:1:nEnd    
     dtemdt, domgdt, tem, omg, psi = data_utils.load_data(saveDir, k)
 
     # Spectral to spatial transforms in x-direction
@@ -52,7 +54,7 @@ for k = nStart:1:nEnd
     plot(p1, axis = nothing)
 
     # Save
-    png(string(saveDir,"/png/",lpad(k,4,"0")))
-
+    png(string(saveDir,"/",subDir,"/",lpad(k,4,"0")))
 end
+# gif(anim, "test.gif", fps = 15)
 
