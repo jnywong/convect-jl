@@ -92,7 +92,7 @@ zeroth= 1 # plot zeroth mode?
 
 ## Authors
 
-* [**Jenny Wong**](https://jnywong.netlify.app/) - *Institut des Sciences de la Terre*
+* [**Jenny Wong**](https://jnywong.github.io/) - *Institut des Sciences de la Terre*
   
 
 ## License
